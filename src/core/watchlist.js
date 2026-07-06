@@ -2,7 +2,12 @@
  * Core watchlist logic.
  * Uses TradingView's internal widget API with DOM fallback.
  */
-import { evaluate, evaluateAsync, getClient } from '../connection.js';
+import {
+  evaluate,
+  evaluateAsync,
+  getClient,
+  safeString,
+} from "../connection.js";
 
 export async function get() {
   // Try internal API first — reads from the active watchlist widget
@@ -57,7 +62,7 @@ export async function get() {
   return {
     success: true,
     count: symbols?.symbols?.length || 0,
-    source: symbols?.source || 'unknown',
+    source: symbols?.source || "unknown",
     symbols: symbols?.symbols || [],
   };
 }
@@ -81,7 +86,7 @@ export async function add({ symbol }) {
   `);
 
   if (panelState?.error) throw new Error(panelState.error);
-  if (panelState?.opened) await new Promise(r => setTimeout(r, 500));
+  if (panelState?.opened) await new Promise((r) => setTimeout(r, 500));
 
   // Click the "Add symbol" button (various selectors)
   const addClicked = await evaluate(`
@@ -112,21 +117,118 @@ export async function add({ symbol }) {
     })()
   `);
 
-  if (!addClicked?.found) throw new Error('Add symbol button not found in watchlist panel');
-  await new Promise(r => setTimeout(r, 300));
+  if (!addClicked?.found)
+    throw new Error("Add symbol button not found in watchlist panel");
+  await new Promise((r) => setTimeout(r, 300));
 
   // Type the symbol into the search input
   await c.Input.insertText({ text: symbol });
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   // Press Enter to select the first result
-  await c.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-  await c.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter' });
-  await new Promise(r => setTimeout(r, 300));
+  await c.Input.dispatchKeyEvent({
+    type: "keyDown",
+    key: "Enter",
+    code: "Enter",
+    windowsVirtualKeyCode: 13,
+  });
+  await c.Input.dispatchKeyEvent({
+    type: "keyUp",
+    key: "Enter",
+    code: "Enter",
+  });
+  await new Promise((r) => setTimeout(r, 300));
 
   // Press Escape to close search
-  await c.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-  await c.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape' });
+  await c.Input.dispatchKeyEvent({
+    type: "keyDown",
+    key: "Escape",
+    code: "Escape",
+    windowsVirtualKeyCode: 27,
+  });
+  await c.Input.dispatchKeyEvent({
+    type: "keyUp",
+    key: "Escape",
+    code: "Escape",
+  });
 
-  return { success: true, symbol, action: 'added' };
+  return { success: true, symbol, action: "added" };
+}
+
+export async function remove({ symbol }) {
+  // Right-click the matching watchlist row and click "Remove from Watch List"
+  const c = await getClient();
+
+  const rowFound = await evaluate(`
+    (function() {
+      var container = document.querySelector('[class*="layout__area--right"]');
+      if (!container) return { error: 'Watchlist panel not found or closed' };
+
+      var target = ${safeString(symbol)}.toUpperCase();
+      var symbolEls = container.querySelectorAll('[data-symbol-full]');
+      var match = null;
+      for (var i = 0; i < symbolEls.length; i++) {
+        var sym = (symbolEls[i].getAttribute('data-symbol-full') || '').toUpperCase();
+        if (sym === target || sym.endsWith(':' + target)) { match = symbolEls[i]; break; }
+      }
+      if (!match) return { error: 'Symbol not found in watchlist: ' + ${safeString(symbol)} };
+
+      var row = match.closest('[class*="row"]') || match.parentElement;
+      var rect = row.getBoundingClientRect();
+      return { found: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    })()
+  `);
+
+  if (rowFound?.error) throw new Error(rowFound.error);
+
+  // Dispatch a right-click at the row's location to open the context menu
+  await c.Input.dispatchMouseEvent({
+    type: "mousePressed",
+    x: rowFound.x,
+    y: rowFound.y,
+    button: "right",
+    clickCount: 1,
+  });
+  await c.Input.dispatchMouseEvent({
+    type: "mouseReleased",
+    x: rowFound.x,
+    y: rowFound.y,
+    button: "right",
+    clickCount: 1,
+  });
+  await new Promise((r) => setTimeout(r, 400));
+
+  const removed = await evaluate(`
+    (function() {
+      var items = document.querySelectorAll('[role="menuitem"], [class*="item-"]');
+      for (var i = 0; i < items.length; i++) {
+        var text = items[i].textContent.trim().toLowerCase();
+        if (text === 'remove' || text.indexOf('remove from watch') === 0) {
+          items[i].click();
+          return { found: true, label: items[i].textContent.trim() };
+        }
+      }
+      return { found: false };
+    })()
+  `);
+
+  if (!removed?.found) {
+    // Close any stray context menu before giving up
+    await c.Input.dispatchKeyEvent({
+      type: "keyDown",
+      key: "Escape",
+      code: "Escape",
+      windowsVirtualKeyCode: 27,
+    });
+    await c.Input.dispatchKeyEvent({
+      type: "keyUp",
+      key: "Escape",
+      code: "Escape",
+    });
+    throw new Error(
+      "Remove option not found in context menu for symbol: " + symbol,
+    );
+  }
+
+  return { success: true, symbol, action: "removed" };
 }

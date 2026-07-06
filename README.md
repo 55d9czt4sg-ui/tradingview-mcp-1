@@ -169,7 +169,7 @@ tv data lines/labels/tables/boxes/strategy/trades/equity/depth/indicator
 tv pine get/set/compile/analyze/check/save/new/open/list/errors/console
 tv draw shape/list/get/remove/clear
 tv alert list/create/delete
-tv watchlist get/add
+tv watchlist get/add/remove
 tv indicator add/remove/toggle/set/get
 tv layout list/switch
 tv pane list/layout/focus/symbol
@@ -331,7 +331,7 @@ Read `line.new()`, `label.new()`, `table.new()`, `box.new()` output from any vis
 | `alert_create` / `alert_list` / `alert_delete` | Manage price alerts |
 | `capture_screenshot` | Screenshot (regions: full, chart, strategy_tester) |
 | `batch_run` | Run action across multiple symbols/timeframes |
-| `watchlist_get` / `watchlist_add` | Read/modify watchlist |
+| `watchlist_get` / `watchlist_add` / `watchlist_remove` | Read/modify watchlist |
 | `layout_list` / `layout_switch` | Manage saved layouts |
 | `ui_open_panel` / `ui_click` / `ui_evaluate` | UI automation |
 | `tv_launch` / `tv_health_check` / `tv_discover` | Connection management |
@@ -378,7 +378,7 @@ npm test
 Claude Code  ←→  MCP Server (stdio)  ←→  CDP (port 9222)  ←→  TradingView Desktop (Electron)
 ```
 
-- **Transport**: MCP over stdio (78 tools) + CLI (`tv` command, 30 commands with 66 subcommands)
+- **Transport**: MCP over stdio (79 tools) + CLI (`tv` command, 30 commands with 67 subcommands)
 - **Connection**: Chrome DevTools Protocol on localhost:9222
 - **Streaming**: Poll-and-diff loop with deduplication, JSONL output to stdout
 - **No dependencies** beyond `@modelcontextprotocol/sdk` and `chrome-remote-interface`

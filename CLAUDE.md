@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # TradingView MCP — Claude Instructions
 
-An MCP server + CLI that bridges Claude Code to a locally running TradingView Desktop app via Chrome DevTools Protocol (CDP, port 9222). 78 tools for reading and controlling a live chart, every one also exposed as a `tv <command>` CLI command. See README.md for the full tool/command list and user-facing setup.
+An MCP server + CLI that bridges Claude Code to a locally running TradingView Desktop app via Chrome DevTools Protocol (CDP, port 9222). 79 tools for reading and controlling a live chart, every one also exposed as a `tv <command>` CLI command. See README.md for the full tool/command list and user-facing setup.
 
 ## Development Commands
 
@@ -163,6 +163,11 @@ Use `study_filter` parameter to target a specific indicator by name substring (e
 - `alert_create` → set price alert (condition: "crossing", "greater_than", "less_than")
 - `alert_list` → view active alerts
 - `alert_delete` → remove alerts
+
+### "Manage watchlist"
+- `watchlist_get` → read current watchlist symbols with last/change/change%
+- `watchlist_add` → add a symbol
+- `watchlist_remove` → remove a symbol (right-clicks the matching row and selects "Remove")
 
 ### "Navigate the UI"
 - `ui_open_panel` → open/close pine-editor, strategy-tester, watchlist, alerts, trading
