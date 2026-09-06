@@ -39,7 +39,8 @@ export async function drawShape({ shape, point, point2, overrides: overridesRaw,
 
   await new Promise(r => setTimeout(r, 200));
   const after = await evaluate(`${apiPath}.getAllShapes().map(function(s) { return s.id; })`);
-  const newId = (after || []).find(id => !(before || []).includes(id)) || null;
+  const beforeSet = new Set(before || []);
+  const newId = (after || []).find(id => !beforeSet.has(id)) || null;
   const result = { entity_id: newId };
   return { success: true, shape, entity_id: result?.entity_id };
 }

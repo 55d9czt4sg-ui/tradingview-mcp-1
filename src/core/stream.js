@@ -2,10 +2,18 @@
  * Core streaming logic — real-time JSONL output from TradingView.
  * Uses efficient poll + dedup: only emits when data changes.
  */
+import { createHash } from 'crypto';
 import { evaluate } from '../connection.js';
 
 const CHART_API = 'window.TradingViewApi._activeChartWidgetWV.value()';
 const MODEL = `${CHART_API}._chartWidget.model()`;
+
+/**
+ * Quick hash function for deduplication (faster than JSON.stringify comparison).
+ */
+function quickHash(obj) {
+  return createHash('sha256').update(JSON.stringify(obj)).digest('hex');
+}
 
 /**
  * Generic poll-and-diff loop.
@@ -33,7 +41,7 @@ async function pollLoop(fetcher, { interval = 500, dedupe = true, label = 'strea
       const data = await fetcher();
       if (!data) { await sleep(interval); continue; }
 
-      const hash = dedupe ? JSON.stringify(data) : null;
+      const hash = dedupe ? quickHash(data) : null;
       if (!dedupe || hash !== lastHash) {
         lastHash = hash;
         const line = JSON.stringify({ ...data, _ts: Date.now(), _stream: label });
