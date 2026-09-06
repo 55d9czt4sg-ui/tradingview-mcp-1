@@ -8,12 +8,19 @@ const CHART_API = 'window.TradingViewApi._activeChartWidgetWV.value()';
 const MODEL = `${CHART_API}._chartWidget.model()`;
 
 /**
+ * Deduplication key derived from the JSON payload so we serialize once for comparison.
+ */
+function dedupeKey(obj) {
+  return JSON.stringify(obj);
+}
+
+/**
  * Generic poll-and-diff loop.
  * Calls fetcher(), compares to last value, emits JSONL on change.
  * Writes to stdout directly for pipe-friendliness.
  */
 async function pollLoop(fetcher, { interval = 500, dedupe = true, label = 'stream' } = {}) {
-  let lastHash = null;
+  let lastKey = null;
   let running = true;
 
   const cleanup = () => { running = false; };
@@ -33,9 +40,9 @@ async function pollLoop(fetcher, { interval = 500, dedupe = true, label = 'strea
       const data = await fetcher();
       if (!data) { await sleep(interval); continue; }
 
-      const hash = dedupe ? JSON.stringify(data) : null;
-      if (!dedupe || hash !== lastHash) {
-        lastHash = hash;
+      const key = dedupe ? dedupeKey(data) : null;
+      if (!dedupe || key !== lastKey) {
+        lastKey = key;
         const line = JSON.stringify({ ...data, _ts: Date.now(), _stream: label });
         process.stdout.write(line + '\n');
       }

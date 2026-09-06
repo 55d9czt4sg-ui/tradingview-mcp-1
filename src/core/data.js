@@ -85,20 +85,30 @@ export async function getOhlcv({ count, summary } = {}) {
 
   if (summary) {
     const bars = data.bars;
-    const highs = bars.map(b => b.high);
-    const lows = bars.map(b => b.low);
-    const volumes = bars.map(b => b.volume);
     const first = bars[0];
     const last = bars[bars.length - 1];
+
+    let high = first.high;
+    let low = first.low;
+    let volumeSum = 0;
+    for (let i = 0; i < bars.length; i++) {
+      const b = bars[i];
+      if (b.high > high) high = b.high;
+      if (b.low < low) low = b.low;
+      volumeSum += b.volume;
+    }
+
+    const range = Math.round((high - low) * 100) / 100;
+    const avgVolume = Math.round(volumeSum / bars.length);
+
     return {
       success: true, bar_count: bars.length,
       period: { from: first.time, to: last.time },
       open: first.open, close: last.close,
-      high: Math.max(...highs), low: Math.min(...lows),
-      range: Math.round((Math.max(...highs) - Math.min(...lows)) * 100) / 100,
+      high, low, range,
       change: Math.round((last.close - first.open) * 100) / 100,
       change_pct: Math.round(((last.close - first.open) / first.open) * 10000) / 100 + '%',
-      avg_volume: Math.round(volumes.reduce((a, b) => a + b, 0) / volumes.length),
+      avg_volume: avgVolume,
       last_5_bars: bars.slice(-5),
     };
   }
@@ -149,7 +159,7 @@ export async function getStrategyResults() {
           var rd = typeof strat.reportData === 'function' ? strat.reportData() : strat.reportData;
           if (rd && typeof rd === 'object') {
             if (typeof rd.value === 'function') rd = rd.value();
-            if (rd) { var keys = Object.keys(rd); for (var k = 0; k < keys.length; k++) { var val = rd[keys[k]]; if (val !== null && val !== undefined && typeof val !== 'function') metrics[keys[k]] = val; } }
+            if (rd) { for (var k in rd) { if (!Object.prototype.hasOwnProperty.call(rd, k)) continue; var val = rd[k]; if (val !== null && val !== undefined && typeof val !== 'function') metrics[k] = val; } }
           }
         }
         if (Object.keys(metrics).length === 0 && strat.performance) {
@@ -306,7 +316,7 @@ export async function getDepth() {
       if (bids.length === 0 && asks.length === 0) {
         var cells = domPanel.querySelectorAll('[class*="cell"], td');
         var prices = [];
-        cells.forEach(function(c) { var val = parseFloat(c.textContent.replace(/[^0-9.\\-]/g, '')); if (!isNaN(val) && val > 0) prices.push(val); });
+        for (var j = 0; j < cells.length; j++) { var val = parseFloat(cells[j].textContent.replace(/[^0-9.\\-]/g, '')); if (!isNaN(val) && val > 0) prices.push(val); }
         if (prices.length > 0) return { found: true, raw_values: prices.slice(0, 50), bids: [], asks: [], note: 'Could not classify bid/ask levels.' };
       }
       bids.sort(function(a, b) { return b.price - a.price; });
