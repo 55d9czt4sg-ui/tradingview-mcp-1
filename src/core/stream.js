@@ -2,17 +2,16 @@
  * Core streaming logic — real-time JSONL output from TradingView.
  * Uses efficient poll + dedup: only emits when data changes.
  */
-import { createHash } from 'node:crypto';
 import { evaluate } from '../connection.js';
 
 const CHART_API = 'window.TradingViewApi._activeChartWidgetWV.value()';
 const MODEL = `${CHART_API}._chartWidget.model()`;
 
 /**
- * Deduplication using SHA-256 hash of JSON-serialized data for consistent change detection.
+ * Deduplication key derived from the JSON payload so we serialize once for comparison.
  */
-function quickHash(obj) {
-  return createHash('sha256').update(JSON.stringify(obj)).digest('hex');
+function dedupeKey(obj) {
+  return JSON.stringify(obj);
 }
 
 /**
@@ -21,7 +20,7 @@ function quickHash(obj) {
  * Writes to stdout directly for pipe-friendliness.
  */
 async function pollLoop(fetcher, { interval = 500, dedupe = true, label = 'stream' } = {}) {
-  let lastHash = null;
+  let lastKey = null;
   let running = true;
 
   const cleanup = () => { running = false; };
@@ -41,9 +40,9 @@ async function pollLoop(fetcher, { interval = 500, dedupe = true, label = 'strea
       const data = await fetcher();
       if (!data) { await sleep(interval); continue; }
 
-      const hash = dedupe ? quickHash(data) : null;
-      if (!dedupe || hash !== lastHash) {
-        lastHash = hash;
+      const key = dedupe ? dedupeKey(data) : null;
+      if (!dedupe || key !== lastKey) {
+        lastKey = key;
         const line = JSON.stringify({ ...data, _ts: Date.now(), _stream: label });
         process.stdout.write(line + '\n');
       }

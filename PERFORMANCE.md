@@ -6,7 +6,7 @@ This document summarizes 6 performance optimizations implemented across the code
 
 | Priority | Issue | Fix | Impact | Status |
 |----------|-------|-----|--------|--------|
-| 🔴 CRITICAL | Math.max/Math.min spread ops (multi-pass, 3 arrays) | Single-pass loop | 4–5× faster OHLCV summary | ✅ Done |
+| 🔴 CRITICAL | Math.max/Math.min spread ops (O(n), multi-pass, 3 arrays) | Single-pass loop | 4–5× faster OHLCV summary; overhead came from extra passes/allocations, not O(n²) complexity | ✅ Done |
 | 🟠 HIGH | Array.includes() O(n²) filters | Convert to Set | 50–100× faster indicator/shape diffing | ✅ Done |
 | 🟠 HIGH | Inefficient dedup comparison on poll | SHA-256 hash instead | Reduce polling impact | ✅ Done |
 | 🟡 MEDIUM | Object.keys() array allocation | for...in loops | ~15% faster metric extraction | ✅ Done |
@@ -15,13 +15,13 @@ This document summarizes 6 performance optimizations implemented across the code
 
 ---
 
-## Issue 1: Math.max/Math.min Spread Operators (CRITICAL)
+## Issue 1: Math.max/Math.min Spread Operators (O(n), CRITICAL)
 
 **File**: `src/core/data.js` (lines 85–110)  
 **Severity**: 🔴 CRITICAL
 
 ### Problem
-The OHLCV summary calculation ran 3 separate map operations plus 4× Math.max/Math.min spread operator calls on large arrays:
+The OHLCV summary calculation ran 3 separate map operations plus 4× Math.max/Math.min spread operator calls on large arrays. That pattern is still **O(n)** overall, but it adds extra full-array passes, temporary allocations, and function-call overhead:
 ```javascript
 const highs = bars.map(b => b.high);
 const lows = bars.map(b => b.low);
@@ -102,17 +102,17 @@ if (!dedupe || hash !== lastHash) {
 JSON.stringify is slow for large objects (quote price data + all indicator values).
 
 ### Solution
-Replace with crypto.createHash for faster string comparison:
+Keep JSON serialization for the dedupe key, but avoid adding a second SHA-256 pass on top of it:
 ```javascript
-function quickHash(obj) {
-  return createHash('sha256').update(JSON.stringify(obj)).digest('hex');
+function dedupeKey(obj) {
+  return JSON.stringify(obj);
 }
-const hash = dedupe ? quickHash(data) : null;
+const key = dedupe ? dedupeKey(data) : null;
 ```
 
 ### Impact
-- **Speedup**: 2–3× faster hash comparison
-- **Per cycle**: 100ms poll → ~2–5ms hash overhead now vs 5–10ms before
+- **Speedup**: Avoids extra digest work while keeping stable change detection
+- **Per cycle**: 100ms poll → serialization remains, but redundant SHA-256 CPU cost is removed
 - **Frequency**: Constant for streaming (highest CPU user on realtime data)
 - **Typical run**: 60-second stream = 120–240 dedup cycles
 
