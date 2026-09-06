@@ -6,9 +6,9 @@ This document summarizes 6 performance optimizations implemented across the code
 
 | Priority | Issue | Fix | Impact | Status |
 |----------|-------|-----|--------|--------|
-| 🔴 CRITICAL | Math.max/Math.min spread ops (O(n²)) | Single-pass loop | 4–5× faster OHLCV summary | ✅ Done |
+| 🔴 CRITICAL | Math.max/Math.min spread ops (multi-pass, 3 arrays) | Single-pass loop | 4–5× faster OHLCV summary | ✅ Done |
 | 🟠 HIGH | Array.includes() O(n²) filters | Convert to Set | 50–100× faster indicator/shape diffing | ✅ Done |
-| 🟠 HIGH | JSON.stringify dedup on poll | Crypto hash | 2–3× faster streaming cycles | ✅ Done |
+| 🟠 HIGH | Inefficient dedup comparison on poll | SHA-256 hash instead | Reduce polling impact | ✅ Done |
 | 🟡 MEDIUM | Object.keys() array allocation | for...in loops | ~15% faster metric extraction | ✅ Done |
 | 🟡 MEDIUM | forEach(push) accumulation | for loop | ~10% faster DOM cell parsing | ✅ Done |
 | ⚪ LOW | API path verification | Cache result | ~5% improvement on first call | —Not critical |
