@@ -159,7 +159,7 @@ export async function getStrategyResults() {
           var rd = typeof strat.reportData === 'function' ? strat.reportData() : strat.reportData;
           if (rd && typeof rd === 'object') {
             if (typeof rd.value === 'function') rd = rd.value();
-            if (rd) { for (var k in rd) { var val = rd[k]; if (val !== null && val !== undefined && typeof val !== 'function') metrics[k] = val; } }
+            if (rd) { for (var k in rd) { if (!Object.prototype.hasOwnProperty.call(rd, k)) continue; var val = rd[k]; if (val !== null && val !== undefined && typeof val !== 'function') metrics[k] = val; } }
           }
         }
         if (Object.keys(metrics).length === 0 && strat.performance) {
