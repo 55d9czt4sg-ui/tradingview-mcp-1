@@ -7,8 +7,19 @@ Provides functions to fetch historical OHLCV data for backtesting and analysis.
 import json
 import sys
 import time
+import warnings
+import os
 import yfinance as yf
 from datetime import datetime, timedelta
+
+# Suppress yfinance and urllib3 warnings to avoid polluting stdout
+warnings.filterwarnings('ignore')
+os.environ['PYTHONWARNINGS'] = 'ignore'
+
+# Redirect stderr to avoid yfinance printing errors to stdout
+import io
+_stderr_backup = sys.stderr
+sys.stderr = io.StringIO()
 
 
 def fetch_ohlcv(symbol, period="1mo", interval="1d"):
@@ -87,6 +98,17 @@ def fetch_quote(symbol):
             ticker = yf.Ticker(symbol)
             info = ticker.info
             
+            # Check if we actually got data
+            if not info or info.get('currentPrice') is None and info.get('regularMarketPrice') is None:
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+                return {
+                    "success": False,
+                    "error": "No price data available for symbol",
+                    "symbol": symbol
+                }
+            
             return {
                 "success": True,
                 "symbol": symbol,
@@ -100,13 +122,16 @@ def fetch_quote(symbol):
             }
         
         except Exception as e:
+            error_msg = str(e)
+            # Log the actual error for debugging but return a clean message
             if attempt < max_retries - 1:
                 time.sleep(2 ** attempt)  # Exponential backoff
                 continue
             return {
                 "success": False,
-                "error": str(e),
-                "symbol": symbol
+                "error": "Failed to fetch quote - rate limited or data unavailable",
+                "symbol": symbol,
+                "details": error_msg
             }
 
 
@@ -138,4 +163,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        # Restore stderr
+        sys.stderr = _stderr_backup
