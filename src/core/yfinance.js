@@ -40,7 +40,7 @@ function executeYfinancePython(command, args = []) {
         const result = JSON.parse(stdout);
         resolve(result);
       } catch (e) {
-        reject(new Error(`Failed to parse Python output: ${e.message}`));
+        reject(new Error(`Failed to parse Python output: ${e.message}\nStderr: ${stderr}`));
       }
     });
   });

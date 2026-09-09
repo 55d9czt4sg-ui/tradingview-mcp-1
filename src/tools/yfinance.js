@@ -76,7 +76,7 @@ async function handleGetQuote(input) {
         success: false,
         error: result.error || 'Failed to fetch quote',
         symbol: parsed.symbol
-      });
+      }, true);
     }
 
     return jsonResult(result);
@@ -84,7 +84,7 @@ async function handleGetQuote(input) {
     return jsonResult({
       success: false,
       error: error.message
-    });
+    }, true);
   }
 }
 
