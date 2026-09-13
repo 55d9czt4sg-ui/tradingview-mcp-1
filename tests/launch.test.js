@@ -2,7 +2,7 @@
  * Tests for the launch() function in src/core/health.js.
  *
  * Covers: path detection, kill-existing, direct spawn success/failure,
- * macOS `open -a` fallback, Linux/Windows env-var fallback,
+ * macOS `open -na` fallback, Linux/Windows env-var fallback,
  * CDP polling (success + timeout), and error messages.
  */
 import { describe, it } from 'node:test';
@@ -171,6 +171,8 @@ describe('launch() — kill existing', () => {
     await launch({ port: 9222, deps: deps });
     const pkillCall = deps._execSyncCalls.find(c => c.cmd.includes('pkill'));
     assert.ok(pkillCall, 'pkill was called');
+    const forceKillCall = deps._execSyncCalls.find(c => c.cmd.includes('pkill -9 -x TradingView'));
+    assert.ok(forceKillCall, 'stale main process is force-killed after graceful shutdown');
   });
 
   it('calls taskkill on win32', async () => {
@@ -219,6 +221,7 @@ describe('launch() — direct spawn succeeds (old TradingView)', () => {
     await launch({ port: 4444, kill_existing: false, deps: deps });
     const spawnCall = deps._spawnCalls[0];
     assert.equal(spawnCall.args[0], '--remote-debugging-port=4444');
+    assert.ok(spawnCall.args.includes('--remote-debugging-address=127.0.0.1'));
   });
 
   it('returns cdp_ready:false warning when CDP never responds', async () => {
@@ -234,7 +237,7 @@ describe('launch() — direct spawn succeeds (old TradingView)', () => {
 });
 
 describe('launch() — spawn fails, macOS fallback', () => {
-  it('kills existing, then uses open -a with .app bundle when direct spawn exits non-zero', async () => {
+  it('kills existing, then uses open -na with .app bundle when direct spawn exits non-zero', async () => {
     const deps = mockDeps({
       platform: 'darwin',
       existsSync: (p) => p === TV_BIN,
@@ -247,20 +250,21 @@ describe('launch() — spawn fails, macOS fallback', () => {
 
     const result = await launch({ port: 9222, kill_existing: false, deps: deps });
 
-    // Should have re-killed before open -a (critical: open -a only works on fresh launch)
+    // Should have re-killed before open -na (critical: open -na only works on fresh launch)
     const pkillCall = deps._execSyncCalls.find(c => c.cmd.includes('pkill'));
     assert.ok(pkillCall, 'pkill called in fallback path to ensure clean launch');
 
-    // Should have called execSync with open -a
-    const openCall = deps._execSyncCalls.find(c => c.cmd.includes('open -a'));
-    assert.ok(openCall, 'open -a was called as fallback');
+    // Should have called execSync with open -na
+    const openCall = deps._execSyncCalls.find(c => c.cmd.includes('open -na'));
+    assert.ok(openCall, 'open -na was called as fallback');
     assert.ok(openCall.cmd.includes('/Applications/TradingView.app'), 'uses .app bundle path');
     assert.ok(openCall.cmd.includes('--remote-debugging-port=9222'), 'passes CDP port');
+    assert.ok(openCall.cmd.includes('--remote-debugging-address=127.0.0.1'), 'binds CDP locally');
 
-    // pkill should come BEFORE open -a
+    // pkill should come BEFORE open -na
     const pkillIdx = deps._execSyncCalls.findIndex(c => c.cmd.includes('pkill'));
-    const openIdx = deps._execSyncCalls.findIndex(c => c.cmd.includes('open -a'));
-    assert.ok(pkillIdx < openIdx, 'pkill runs before open -a');
+    const openIdx = deps._execSyncCalls.findIndex(c => c.cmd.includes('open -na'));
+    assert.ok(pkillIdx < openIdx, 'pkill runs before open -na');
 
     assert.equal(result.success, true);
     assert.equal(result.fallback_used, true);
@@ -360,7 +364,7 @@ describe('launch() — spawn fails, Linux/Windows fallback', () => {
 });
 
 describe('launch() — spawn error event', () => {
-  it('detects spawn error (ENOENT) and falls back via open -a', async () => {
+  it('detects spawn error (ENOENT) and falls back via open -na', async () => {
     const deps = mockDeps({
       platform: 'darwin',
       existsSync: (p) => p === TV_BIN,
@@ -372,10 +376,10 @@ describe('launch() — spawn error event', () => {
     });
 
     const result = await launch({ port: 9222, kill_existing: false, deps: deps });
-    // Should have triggered fallback: pkill then open -a
+    // Should have triggered fallback: pkill then open -na
     const pkillCall = deps._execSyncCalls.find(c => c.cmd && c.cmd.includes('pkill'));
     assert.ok(pkillCall, 'pkill called in fallback after spawn error');
-    const openCall = deps._execSyncCalls.find(c => c.cmd && c.cmd.includes('open -a'));
+    const openCall = deps._execSyncCalls.find(c => c.cmd && c.cmd.includes('open -na'));
     assert.ok(openCall, 'macOS open fallback was triggered after spawn error');
   });
 });
