@@ -254,7 +254,11 @@ export async function launch({ port, kill_existing, deps: _deps } = {}) {
     try {
       if (platform === "win32")
         deps.execSync("taskkill /F /IM TradingView.exe", { timeout: 5000 });
-      else deps.execSync("pkill -f TradingView", { timeout: 5000 });
+      else if (platform === "darwin") {
+        deps.execSync("pkill -f TradingView", { timeout: 5000 });
+        await new Promise((r) => setTimeout(r, 1500));
+        deps.execSync("pkill -9 -x TradingView", { timeout: 5000 });
+      } else deps.execSync("pkill -f TradingView", { timeout: 5000 });
       await new Promise((r) => setTimeout(r, 1500));
     } catch {
       /* may not be running */
@@ -264,7 +268,10 @@ export async function launch({ port, kill_existing, deps: _deps } = {}) {
   // Try direct spawn first (works on TradingView < v2.14 / Electron < 38).
   // Electron 38+ (Node 22) rejects --remote-debugging-port as an unknown CLI flag
   // before Chromium can process it. Detect that and fall back to platform-specific strategies.
-  let child = deps.spawn(tvPath, [`--remote-debugging-port=${cdpPort}`], {
+  let child = deps.spawn(tvPath, [
+    `--remote-debugging-port=${cdpPort}`,
+    "--remote-debugging-address=127.0.0.1",
+  ], {
     detached: true,
     stdio: ["ignore", "ignore", "pipe"],
   });
@@ -304,6 +311,8 @@ export async function launch({ port, kill_existing, deps: _deps } = {}) {
       // instance is running, otherwise macOS just activates the old (non-CDP) window.
       try {
         deps.execSync("pkill -f TradingView", { timeout: 5000 });
+        await new Promise((r) => setTimeout(r, 1500));
+        deps.execSync("pkill -9 -x TradingView", { timeout: 5000 });
       } catch {
         /* may not be running */
       }
@@ -315,7 +324,7 @@ export async function launch({ port, kill_existing, deps: _deps } = {}) {
         const appBundle = appMatch[1];
         try {
           deps.execSync(
-            `open -a "${appBundle}" --args --remote-debugging-port=${cdpPort}`,
+            `open -na "${appBundle}" --args --remote-debugging-port=${cdpPort} --remote-debugging-address=127.0.0.1`,
             { timeout: 5000 },
           );
         } catch {

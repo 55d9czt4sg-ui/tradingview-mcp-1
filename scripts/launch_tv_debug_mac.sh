@@ -46,12 +46,15 @@ fi
 # Kill any existing TradingView
 pkill -f "TradingView" 2>/dev/null
 sleep 1
+pkill -9 -x "TradingView" 2>/dev/null
+sleep 1
 
 echo "Found TradingView at: $APP"
 echo "Launching with --remote-debugging-port=$PORT ..."
-"$APP" --remote-debugging-port=$PORT &
-TV_PID=$!
-echo "PID: $TV_PID"
+open -na "${APP%/Contents/MacOS/TradingView}" --args \
+  --remote-debugging-port="$PORT" \
+  --remote-debugging-address=127.0.0.1
+echo "TradingView launch requested via macOS open"
 
 # Wait for CDP to be ready
 echo "Waiting for CDP..."
